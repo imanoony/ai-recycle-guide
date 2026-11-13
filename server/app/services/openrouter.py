@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -18,12 +19,17 @@ from app.services.image_input import PreparedImage
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """당신은 사진 속 폐기물 후보를 식별하는 비전 분석기입니다.
+SYSTEM_PROMPT = (
+    """당신은 사진 속 폐기물 후보를 식별하는 비전 분석기입니다.
 사진에 실제로 보이는 폐기물 품목과 재질만 판단하고, 품목별 확신도를 0에서 1 사이로 반환하세요.
 분리배출 방법, 지역별 규칙, 근거 URL이나 출처는 만들지 마세요. 이는 별도 규칙 시스템이 처리합니다.
 품목을 확실히 식별할 수 없으면 status를 unidentified로, 후보를 확인해야 하면 needs_clarification으로 설정하고 이유를 짧게 적으세요.
 여러 품목이 보이면 서로 구분해 최대 6개까지 반환하세요. 배경의 불확실한 물체는 품목으로 단정하지 마세요.
-응답은 지정된 JSON Schema만 따르세요."""
+응답은 아래 JSON Schema와 정확히 일치하는 JSON 객체 하나만 반환하세요.
+"""
+    + "JSON Schema: "
+    + json.dumps(VISION_JSON_SCHEMA, ensure_ascii=False)
+)
 
 USER_PROMPT = "사진 속 분리배출 대상 품목을 식별해 주세요. 불확실하면 확답하지 마세요."
 
@@ -68,11 +74,13 @@ class OpenRouterVisionProvider:
                 retryable=False,
             )
 
+        model = self._settings.openrouter_model.strip()
+        use_json_mode = model.endswith(":free")
         image_data_url = (
             f"data:{image.content_type};base64,{base64.b64encode(image.data).decode('ascii')}"
         )
         request_body = {
-            "model": self._settings.openrouter_model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
@@ -89,16 +97,22 @@ class OpenRouterVisionProvider:
             "max_tokens": 1024,
             "usage": {"include": True},
             "temperature": 0.1,
-            "provider": {"require_parameters": True},
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "waste_vision_result",
-                    "strict": True,
-                    "schema": VISION_JSON_SCHEMA,
-                },
-            },
+            "response_format": (
+                {"type": "json_object"}
+                if use_json_mode
+                else {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "waste_vision_result",
+                        "strict": True,
+                        "schema": VISION_JSON_SCHEMA,
+                    },
+                }
+            ),
         }
+        if not use_json_mode:
+            request_body["provider"] = {"require_parameters": True}
+
         endpoint = f"{self._settings.openrouter_base_url.rstrip('/')}/chat/completions"
         timeout = httpx.Timeout(self._settings.openrouter_timeout_seconds)
         started_at = time.monotonic()
