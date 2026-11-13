@@ -8,13 +8,20 @@ sealed interface AppUiState {
 
     data class Analyzing(
         val photo: File,
-        val failure: AnalysisFailure? = null,
     ) : AppUiState
 
-    data class Result(val response: AnalysisResponse) : AppUiState
+    data class Result(
+        val outcome: AnalysisOutcome,
+    ) : AppUiState
+}
+
+sealed interface AnalysisOutcome {
+    data class Success(val response: AnalysisResponse) : AnalysisOutcome
+    data class Error(val failure: AnalysisFailure, val retryPhoto: File) : AnalysisOutcome
 }
 
 data class AnalysisFailure(
+    val code: String,
     val message: String,
     val retryable: Boolean,
 )

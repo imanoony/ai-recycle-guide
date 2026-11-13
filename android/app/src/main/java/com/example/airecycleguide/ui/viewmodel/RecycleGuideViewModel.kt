@@ -1,8 +1,12 @@
 package com.example.airecycleguide.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.example.airecycleguide.data.model.AnalysisResponse
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.example.airecycleguide.data.repository.AnalysisCallResult
+import com.example.airecycleguide.data.repository.AnalysisRepository
 import com.example.airecycleguide.ui.state.AnalysisFailure
+import com.example.airecycleguide.ui.state.AnalysisOutcome
 import com.example.airecycleguide.ui.state.AppUiState
 import com.example.airecycleguide.ui.state.CameraPermissionState
 import java.io.File
@@ -10,8 +14,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
-class RecycleGuideViewModel : ViewModel() {
+class RecycleGuideViewModel(
+    private val analysisRepository: AnalysisRepository,
+) : ViewModel() {
     private val _uiState = MutableStateFlow<AppUiState>(AppUiState.Camera)
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
@@ -19,44 +26,61 @@ class RecycleGuideViewModel : ViewModel() {
     val cameraPermission: StateFlow<CameraPermissionState> = _cameraPermission.asStateFlow()
 
     private var analysisJob: Job? = null
+    private var currentRegion: String? = null
 
     fun updateCameraPermission(state: CameraPermissionState) {
         _cameraPermission.value = state
     }
 
-    fun beginAnalysis(photo: File) {
+    fun beginAnalysis(photo: File, region: String? = null) {
         if (_uiState.value !is AppUiState.Camera || !photo.isFile) {
             photo.delete()
             return
         }
         cancelAnalysisJob()
+        currentRegion = region
         _uiState.value = AppUiState.Analyzing(photo)
+        requestAnalysis(photo, region)
     }
 
-    fun attachAnalysisJob(job: Job) {
-        cancelAnalysisJob()
-        analysisJob = job
+    fun retryAnalysis() {
+        val result = _uiState.value as? AppUiState.Result ?: return
+        val error = result.outcome as? AnalysisOutcome.Error ?: return
+        if (!error.failure.retryable || !error.retryPhoto.isFile) return
+
+        _uiState.value = AppUiState.Analyzing(error.retryPhoto)
+        requestAnalysis(error.retryPhoto, currentRegion)
     }
 
-    fun reportAnalysisFailure(message: String, retryable: Boolean) {
-        val current = _uiState.value as? AppUiState.Analyzing ?: return
-        _uiState.value = current.copy(failure = AnalysisFailure(message, retryable))
-        analysisJob = null
-    }
+    private fun requestAnalysis(photo: File, region: String?) {
+        analysisJob = viewModelScope.launch {
+            when (val result = analysisRepository.analyze(photo, region)) {
+                is AnalysisCallResult.Success -> {
+                    val current = _uiState.value as? AppUiState.Analyzing ?: return@launch
+                    if (current.photo != photo) return@launch
+                    photo.delete()
+                    _uiState.value = AppUiState.Result(
+                        AnalysisOutcome.Success(result.response),
+                    )
+                }
 
-    /** Clears the visible failure and returns the retained photo for a caller to retry. */
-    fun prepareRetry(): File? {
-        val current = _uiState.value as? AppUiState.Analyzing ?: return null
-        if (current.failure?.retryable != true || !current.photo.isFile) return null
-        _uiState.value = current.copy(failure = null)
-        return current.photo
-    }
-
-    fun showResult(response: AnalysisResponse) {
-        val current = _uiState.value as? AppUiState.Analyzing ?: return
-        cancelAnalysisJob()
-        current.photo.delete()
-        _uiState.value = AppUiState.Result(response)
+                is AnalysisCallResult.Failure -> {
+                    val current = _uiState.value as? AppUiState.Analyzing ?: return@launch
+                    if (current.photo != photo) return@launch
+                    _uiState.value = AppUiState.Result(
+                        AnalysisOutcome.Error(
+                            failure = AnalysisFailure(
+                                code = result.error.code,
+                                message = result.error.message,
+                                retryable = result.error.retryable,
+                            ),
+                            retryPhoto = photo,
+                        ),
+                    )
+                }
+            }
+            analysisJob = null
+        }
     }
 
     /** Returns true when the back action was consumed by an in-app state transition. */
@@ -68,7 +92,8 @@ class RecycleGuideViewModel : ViewModel() {
 
     fun returnToCamera() {
         cancelAnalysisJob()
-        (_uiState.value as? AppUiState.Analyzing)?.photo?.delete()
+        deleteOwnedPhoto(_uiState.value)
+        currentRegion = null
         _uiState.value = AppUiState.Camera
     }
 
@@ -77,9 +102,30 @@ class RecycleGuideViewModel : ViewModel() {
         analysisJob = null
     }
 
+    private fun deleteOwnedPhoto(state: AppUiState) {
+        when (state) {
+            is AppUiState.Analyzing -> state.photo.delete()
+            is AppUiState.Result -> (state.outcome as? AnalysisOutcome.Error)?.retryPhoto?.delete()
+            AppUiState.Camera -> Unit
+        }
+    }
+
     override fun onCleared() {
         cancelAnalysisJob()
-        (_uiState.value as? AppUiState.Analyzing)?.photo?.delete()
+        deleteOwnedPhoto(_uiState.value)
         super.onCleared()
+    }
+
+    companion object {
+        fun factory(repository: AnalysisRepository): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    if (modelClass.isAssignableFrom(RecycleGuideViewModel::class.java)) {
+                        return RecycleGuideViewModel(repository) as T
+                    }
+                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+                }
+            }
     }
 }
