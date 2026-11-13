@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.airecycleguide"
-        minSdk = 36
+        minSdk = 34
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
