@@ -1,0 +1,28 @@
+﻿# Project planning note
+/codex_note.md
+
+# Android / Gradle
+*.iml
+.gradle/
+/android/local.properties
+/android/.idea/caches/
+/android/.idea/libraries/
+/android/.idea/modules.xml
+/android/.idea/workspace.xml
+/android/.idea/navEditor.xml
+/android/.idea/assetWizardSettings.xml
+.DS_Store
+/android/build/
+/android/app/build/
+/android/captures/
+/android/.externalNativeBuild/
+/android/.cxx/
+
+# Python / FastAPI
+/server/.venv/
+/server/**/__pycache__/
+/server/**/*.py[cod]
+/server/.env
+/server/.pytest_cache/
+/server/.mypy_cache/
+/server/.ruff_cache/
