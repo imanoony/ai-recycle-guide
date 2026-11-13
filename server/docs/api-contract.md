@@ -7,7 +7,7 @@ Status: Initial contract for Android/server implementation
 
 `POST /api/v1/analyze`
 
-Accepts one photo and returns identified waste items with step-by-step sorting guidance. The backend will analyze the image through OpenRouter and Gemma 4 31B, then attach sorting guidance and sources when supported by the configured regional rules.
+Accepts one photo and identifies visible waste items through OpenRouter and Gemma 4 31B. A separate regional-rules service will provide disposal steps and sources; until that service is connected, identified items use `sorting_status: unknown` with empty steps and sources.
 
 ## Request
 
@@ -102,7 +102,7 @@ FastAPI validation errors must be translated to this envelope rather than return
 
 - Upload validation enforces JPEG/PNG/WebP by actual decoding, a 10 MiB byte limit, and a 24,000,000-pixel limit. Valid input is orientation-corrected and normalized to a JPEG with a maximum 4,096-pixel side.
 - Region is deliberately a human-readable hint for v1; a canonical region-code system can be added in a later API version.
-- Exact OpenRouter model ID and image input capability must be checked before the provider adapter is implemented.
+- Confirm the selected model and image input against the current OpenRouter catalog before runtime calls; the implementation defaults to `google/gemma-4-31b-it`.
 
 
 
