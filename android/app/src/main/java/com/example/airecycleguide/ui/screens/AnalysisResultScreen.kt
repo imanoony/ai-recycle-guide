@@ -82,7 +82,7 @@ private fun AnalysisResponseContent(response: AnalysisResponse) {
     )
 
     response.region?.takeIf { it.isNotBlank() }?.let {
-        Text("요청 지역: $it", style = MaterialTheme.typography.bodyMedium)
+        Text("적용 기준 지역: $it", style = MaterialTheme.typography.bodyMedium)
     }
     response.message?.takeIf { it.isNotBlank() }?.let { Text(it) }
 
