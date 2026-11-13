@@ -25,9 +25,8 @@ class VisionAnalysis(BaseModel):
     message: Annotated[str, Field(max_length=400)] | None
 
 
-VISION_JSON_SCHEMA = {
+GEMINI_RESPONSE_JSON_SCHEMA = {
     "type": "object",
-    "additionalProperties": False,
     "properties": {
         "status": {
             "type": "string",
@@ -38,12 +37,13 @@ VISION_JSON_SCHEMA = {
             "maxItems": 6,
             "items": {
                 "type": "object",
-                "additionalProperties": False,
                 "properties": {
-                    "name": {"type": "string", "minLength": 1, "maxLength": 100},
-                    "material": {"type": ["string", "null"], "maxLength": 100},
+                    "name": {"type": "string"},
+                    "material": {
+                        "anyOf": [{"type": "string"}, {"type": "null"}]
+                    },
                     "confidence": {
-                        "type": ["number", "null"],
+                        "anyOf": [{"type": "number"}, {"type": "null"}],
                         "minimum": 0.0,
                         "maximum": 1.0,
                     },
@@ -62,11 +62,10 @@ VISION_JSON_SCHEMA = {
                         "maxItems": 8,
                         "items": {
                             "type": "object",
-                            "additionalProperties": False,
                             "properties": {
                                 "order": {"type": "integer", "minimum": 1},
-                                "title": {"type": "string", "minLength": 1},
-                                "instruction": {"type": "string", "minLength": 1},
+                                "title": {"type": "string"},
+                                "instruction": {"type": "string"},
                             },
                             "required": ["order", "title", "instruction"],
                         },
@@ -74,12 +73,12 @@ VISION_JSON_SCHEMA = {
                     "cautions": {
                         "type": "array",
                         "maxItems": 8,
-                        "items": {"type": "string", "maxLength": 400},
+                        "items": {"type": "string"},
                     },
                     "rule_ids": {
                         "type": "array",
                         "maxItems": 6,
-                        "items": {"type": "string", "minLength": 1, "maxLength": 100},
+                        "items": {"type": "string"},
                     },
                 },
                 "required": [
@@ -93,7 +92,9 @@ VISION_JSON_SCHEMA = {
                 ],
             },
         },
-        "message": {"type": ["string", "null"], "maxLength": 400},
+        "message": {
+            "anyOf": [{"type": "string"}, {"type": "null"}]
+        },
     },
     "required": ["status", "items", "message"],
 }

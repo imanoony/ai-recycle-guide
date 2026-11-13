@@ -1,4 +1,4 @@
-﻿from enum import StrEnum
+from enum import StrEnum
 from typing import Annotated
 from uuid import UUID
 
@@ -10,6 +10,7 @@ class ErrorCode(StrEnum):
     IMAGE_TOO_LARGE = "image_too_large"
     UNSUPPORTED_IMAGE_TYPE = "unsupported_image_type"
     INVALID_ANALYSIS_OUTPUT = "invalid_analysis_output"
+    RATE_LIMITED = "rate_limited"
     ANALYSIS_UNAVAILABLE = "analysis_unavailable"
     INTERNAL_ERROR = "internal_error"
 

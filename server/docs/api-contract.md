@@ -7,7 +7,7 @@ Status: Initial contract for Android/server implementation
 
 `POST /api/v1/analyze`
 
-Accepts one photo and sends it together with the complete Gwanak-gu rules JSON to OpenRouter and Gemma 4 31B. The model identifies visible waste items and creates step-by-step disposal guidance from those rules. The server validates the model-selected rule IDs and attaches source metadata from the JSON. Gwanak-gu rules are always applied in this demo.
+Accepts one photo and sends it together with the complete Gwanak-gu rules JSON to Gemini API and Gemini 3.8 Flash. The model identifies visible waste items and creates step-by-step disposal guidance from those rules. The server validates the model-selected rule IDs and attaches source metadata from the JSON. Gwanak-gu rules are always applied in this demo.
 
 ## Request
 
@@ -70,7 +70,7 @@ The sample source points to the official Gwanak-gu recycling guidance page.
 - `sources`: supporting rule sources. Each source has a title, URL, applicable region when known, and the date it was checked; `checked_at` may be `null` if unavailable.
 - `message`: optional user-facing explanation, especially when clarification is needed or no item can be identified.
 
-`needs_clarification` and `unidentified` responses may have an empty `items` array. The API must not invent a local rule or source when none is available. The model receives the complete Gwanak-gu JSON with the photo; the server only accepts guidance when the returned rule IDs exist and their sorting status agrees with the selected rules. A `local_confirmation_required` item has no unsupported steps or cautions and clearly states that the final disposal route needs local confirmation.
+`needs_clarification` and `unidentified` responses may have an empty `items` array. The API must not invent a local rule or source when none is available. The Gemini model receives the complete Gwanak-gu JSON with the photo; the server only accepts guidance when the returned rule IDs exist and their sorting status agrees with the selected rules. A `local_confirmation_required` item has no unsupported steps or cautions and clearly states that the final disposal route needs local confirmation.
 
 ## Errors
 
@@ -93,7 +93,8 @@ All API errors use this envelope:
 | `413` | `image_too_large` | No | Upload exceeds 10 MiB or 24,000,000 decoded pixels. |
 | `415` | `unsupported_image_type` | No | File is not a supported, decodable image. |
 | `422` | `invalid_analysis_output` | No | Model output cannot be validated against the server schema. |
-| `503` | `analysis_unavailable` | Usually yes | OpenRouter/model is unavailable, rate limited, or out of service. |
+| `429` | `rate_limited` | Yes | Gemini API rate limit reached; retry after the limit window. No immediate retry is made when Retry-After is absent. |
+| `503` | `analysis_unavailable` | Usually yes | Gemini API/model is unavailable or out of service. |
 | `500` | `internal_error` | No | Unexpected server error; response must not expose internals. |
 
 FastAPI validation errors must be translated to this envelope rather than returned in the framework's default shape. Error messages are safe for clients and must not include secrets, provider response bodies, prompts, or image data.
@@ -102,7 +103,7 @@ FastAPI validation errors must be translated to this envelope rather than return
 
 - Upload validation enforces JPEG/PNG/WebP by actual decoding, a 10 MiB byte limit, and a 24,000,000-pixel limit. Valid input is orientation-corrected and normalized to a JPEG with a maximum 4,096-pixel side.
 - Region is deliberately a human-readable hint for v1; a canonical region-code system can be added in a later API version.
-- Confirm the selected model and image input against the current OpenRouter catalog before runtime calls; the implementation defaults to `google/gemma-4-31b-it`.
+- Confirm the selected model and image input against the current Gemini API catalog before runtime calls; the implementation defaults to `gemini-3.8-flash`.
 
 
 

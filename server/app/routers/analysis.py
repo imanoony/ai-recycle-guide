@@ -26,10 +26,10 @@ from app.services.recycling_rules import (
     resolve_rule_ids,
     rule_context_json,
 )
-from app.services.openrouter import (
-    OpenRouterVisionProvider,
-    VisionProviderOutputError,
-    VisionProviderUnavailable,
+from app.services.gemini import (
+    GeminiAnalysisProvider,
+    GeminiProviderOutputError,
+    GeminiProviderUnavailable,
 )
 
 router = APIRouter()
@@ -39,6 +39,7 @@ _ERROR_RESPONSES = {
     413: {"model": ErrorResponse, "description": "Image exceeds the byte or pixel limit."},
     415: {"model": ErrorResponse, "description": "Unsupported or invalid image."},
     422: {"model": ErrorResponse, "description": "Analysis output could not be validated."},
+    429: {"model": ErrorResponse, "description": "Analysis provider rate limit reached."},
     500: {"model": ErrorResponse, "description": "Unexpected server error."},
     503: {"model": ErrorResponse, "description": "Analysis provider is unavailable."},
 }
@@ -52,7 +53,7 @@ _ERROR_RESPONSES = {
     description=(
         "Accepts one JPEG, PNG, or WebP image up to 10 MiB as multipart field `image` and an optional human-readable `region`. "
         f"Images are limited to {MAX_IMAGE_PIXELS:,} pixels, decoded from their contents, orientation-corrected, and normalized to JPEG. "
-        "The image and the Gwanak-gu rules dataset are sent together to the configured OpenRouter model for identification and disposal guidance. "
+        "The image and the Gwanak-gu rules dataset are sent together to the configured Gemini model for identification and disposal guidance. "
         "The Gwanak-gu rules are always applied; the optional region field is retained for compatibility but does not change the applied region."
     ),
 )
@@ -92,24 +93,28 @@ async def analyze_waste(
         await image.close()
 
     assert prepared_image is not None
-    provider = OpenRouterVisionProvider(get_settings())
+    provider = GeminiAnalysisProvider(get_settings())
     try:
-        provider_result = await provider.identify(
+        provider_result = await provider.analyze(
             prepared_image,
             request_id=request_id,
             rule_context=rule_context_json(),
         )
-    except VisionProviderOutputError:
+    except GeminiProviderOutputError:
         return _error_response(
             status_code=422,
             code=ErrorCode.INVALID_ANALYSIS_OUTPUT,
             message="AI 분석 결과를 확인할 수 없습니다. 다시 시도해 주세요.",
             request_id=request_id,
         )
-    except VisionProviderUnavailable as exc:
+    except GeminiProviderUnavailable as exc:
         return _error_response(
-            status_code=503,
-            code=ErrorCode.ANALYSIS_UNAVAILABLE,
+            status_code=exc.status_code,
+            code=(
+                ErrorCode.RATE_LIMITED
+                if exc.status_code == 429
+                else ErrorCode.ANALYSIS_UNAVAILABLE
+            ),
             message=exc.public_message,
             retryable=exc.retryable,
             request_id=request_id,

@@ -168,4 +168,4 @@ Invoke-Checked $adb @('-s', $deviceId, 'install', '-r', $apkPath) $repoRoot
 Write-Host "Launching $applicationId on $deviceId..."
 Invoke-Checked $adb @('-s', $deviceId, 'shell', 'monkey', '-p', $applicationId, '1') $repoRoot
 Write-Host 'Local demo is running. FastAPI docs: http://127.0.0.1:8000/docs'
-Write-Host 'The current analysis endpoint is a placeholder and returns 503 until the AI service is implemented.'
+Write-Host 'FastAPI analysis is connected to the Gemini API; check the server console for provider errors if analysis fails.'

@@ -50,7 +50,7 @@ class AnalysisResponse(BaseModel):
                 {
                     "request_id": "b6ae1511-1bc3-4bc3-ae98-03ac2a0e0320",
                     "status": "identified",
-                    "region": "Seoul, Mapo-gu",
+                    "region": "\uC11C\uC6B8\uD2B9\uBCC4\uC2DC \uAD00\uC545\uAD6C",
                     "items": [
                         {
                             "name": "투명 페트병",
@@ -66,8 +66,8 @@ class AnalysisResponse(BaseModel):
                             "sources": [
                                 {
                                     "title": "분리배출 안내",
-                                    "url": "https://example.org/recycling",
-                                    "region": "Seoul, Mapo-gu",
+                                    "url": "https://www.gwanak.go.kr/site/gwanak/07/10703010200002016051206.jsp",
+                                    "region": "\uC11C\uC6B8\uD2B9\uBCC4\uC2DC \uAD00\uC545\uAD6C",
                                     "checked_at": "2026-11-14",
                                 }
                             ],
