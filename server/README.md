@@ -1,4 +1,4 @@
-﻿# AI Recycle Guide API
+# AI Recycle Guide API
 
 FastAPI backend for identifying waste in uploaded photos and explaining how to sort it.
 
@@ -18,11 +18,10 @@ uv run fastapi dev app/main.py
 
 Open the interactive API docs at <http://127.0.0.1:8000/docs>.
 
-## Initial endpoint
+## Current endpoints
 
 - `GET /health` — basic liveness check.
-
-The image upload and AI analysis endpoint will be added in a later step.
+- `POST /api/v1/analyze` — validates and normalizes a JPEG, PNG, or WebP upload (up to 10 MiB and 24 MP), then returns `503 analysis_unavailable` until the AI provider is connected.
 
 ## Dependency management
 

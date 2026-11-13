@@ -1,4 +1,4 @@
-﻿# API Contract: Waste Photo Analysis
+# API Contract: Waste Photo Analysis
 
 Version: `v1`  
 Status: Initial contract for Android/server implementation
@@ -15,10 +15,10 @@ Content type: `multipart/form-data`
 
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `image` | file | Yes | One waste photo. JPEG, PNG, and WebP are accepted; maximum file size is 10 MiB. The server will validate the actual image data, not only the MIME header; this validation is not implemented yet. |
+| `image` | file | Yes | One waste photo. JPEG, PNG, and WebP are accepted based on decoded image contents (not the MIME header). Maximum file size is 10 MiB and maximum image size is 24,000,000 pixels. Valid images are orientation-corrected, resized to a maximum side of 4,096 pixels, and normalized to JPEG in memory. |
 | `region` | string | No | Human-readable region hint, such as `Seoul, Mapo-gu`. If absent or insufficient to select a local rule, the result must say that local confirmation is needed. |
 
-The server is designed not to retain the original image after processing. The current placeholder route does not process the image yet.
+The server does not retain the original upload or normalized image after processing. The multipart parser may spool uploads to a temporary file; the upload handle is closed after validation, and the normalized image is held only for the request.
 
 ## Successful response (`200`)
 
@@ -90,7 +90,7 @@ All API errors use this envelope:
 | HTTP status | Error code | Retryable | Meaning |
 | --- | --- | --- | --- |
 | `400` | `invalid_request` | No | Missing or malformed request data. |
-| `413` | `image_too_large` | No | Upload exceeds the configured limit. |
+| `413` | `image_too_large` | No | Upload exceeds 10 MiB or 24,000,000 decoded pixels. |
 | `415` | `unsupported_image_type` | No | File is not a supported, decodable image. |
 | `422` | `invalid_analysis_output` | No | Model output cannot be validated against the server schema. |
 | `503` | `analysis_unavailable` | Usually yes | OpenRouter/model is unavailable, rate limited, or out of service. |
@@ -100,7 +100,7 @@ FastAPI validation errors must be translated to this envelope rather than return
 
 ## Open questions for implementation
 
-- Upload validation must enforce the documented JPEG/PNG/WebP formats and 10 MiB byte limit; the pixel limit will be set in that implementation step.
+- Upload validation enforces JPEG/PNG/WebP by actual decoding, a 10 MiB byte limit, and a 24,000,000-pixel limit. Valid input is orientation-corrected and normalized to a JPEG with a maximum 4,096-pixel side.
 - Region is deliberately a human-readable hint for v1; a canonical region-code system can be added in a later API version.
 - Exact OpenRouter model ID and image input capability must be checked before the provider adapter is implemented.
 
