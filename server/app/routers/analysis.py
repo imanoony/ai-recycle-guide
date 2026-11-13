@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.schemas.analysis import (
     AnalysisResponse,
+    AnalysisStatus,
     SortingStatus,
     WasteItemResult,
 )
@@ -18,6 +19,12 @@ from app.services.image_input import (
     InvalidImageError,
     PreparedImage,
     prepare_image,
+)
+from app.services.recycling_rules import (
+    fallback_sources,
+    region_name,
+    resolve_rule_ids,
+    rule_context_json,
 )
 from app.services.openrouter import (
     OpenRouterVisionProvider,
@@ -45,12 +52,13 @@ _ERROR_RESPONSES = {
     description=(
         "Accepts one JPEG, PNG, or WebP image up to 10 MiB as multipart field `image` and an optional human-readable `region`. "
         f"Images are limited to {MAX_IMAGE_PIXELS:,} pixels, decoded from their contents, orientation-corrected, and normalized to JPEG. "
-        "The image is sent to the configured OpenRouter vision model; this endpoint returns identification only, while disposal guidance is handled by a separate rules step."
+        "The image and the Gwanak-gu rules dataset are sent together to the configured OpenRouter model for identification and disposal guidance. "
+        "The Gwanak-gu rules are always applied; the optional region field is retained for compatibility but does not change the applied region."
     ),
 )
 async def analyze_waste(
     image: Annotated[UploadFile, File(description="Waste photo to analyze.")],
-    region: Annotated[str | None, Form(description="Optional region hint, e.g. Seoul, Mapo-gu.")] = None,
+    region: Annotated[str | None, Form(description="Optional compatibility field. This demo always applies Gwanak-gu rules.")] = None,
 ) -> AnalysisResponse | JSONResponse:
     request_id = uuid4()
     prepared_image: PreparedImage | None = None
@@ -86,7 +94,11 @@ async def analyze_waste(
     assert prepared_image is not None
     provider = OpenRouterVisionProvider(get_settings())
     try:
-        provider_result = await provider.identify(prepared_image, request_id=request_id)
+        provider_result = await provider.identify(
+            prepared_image,
+            request_id=request_id,
+            rule_context=rule_context_json(),
+        )
     except VisionProviderOutputError:
         return _error_response(
             status_code=422,
@@ -104,23 +116,48 @@ async def analyze_waste(
         )
 
     analysis = provider_result.analysis
-    response_items = [
-        WasteItemResult(
-            name=item.name,
-            material=item.material,
-            confidence=item.confidence,
-            sorting_status=SortingStatus.UNKNOWN,
-            steps=[],
-            cautions=[],
-            sources=[],
+    response_items: list[WasteItemResult] = []
+    for item in analysis.items:
+        rules_valid, rule_status, sources = resolve_rule_ids(item.rule_ids)
+        guidance_supported = (
+            rules_valid
+            and rule_status == item.sorting_status
+            and bool(sources)
+            and bool(item.steps)
+            and item.sorting_status
+            not in {SortingStatus.UNKNOWN, SortingStatus.LOCAL_CONFIRMATION_REQUIRED}
         )
-        for item in analysis.items
-    ]
-    normalized_region = region.strip() if region and region.strip() else None
+        if guidance_supported:
+            sorting_status = item.sorting_status
+            steps = item.steps
+            cautions = item.cautions
+        else:
+            sorting_status = SortingStatus.LOCAL_CONFIRMATION_REQUIRED
+            steps = []
+            cautions = []
+            if not sources:
+                sources = fallback_sources()
+
+        if analysis.status != AnalysisStatus.IDENTIFIED:
+            steps = []
+            cautions = []
+
+        response_items.append(
+            WasteItemResult(
+                name=item.name,
+                material=item.material,
+                confidence=item.confidence,
+                sorting_status=sorting_status,
+                steps=steps,
+                cautions=cautions,
+                sources=sources,
+            )
+        )
+
     return AnalysisResponse(
         request_id=request_id,
         status=analysis.status,
-        region=normalized_region,
+        region=region_name(),
         items=response_items,
         message=analysis.message,
     )

@@ -7,7 +7,7 @@ Status: Initial contract for Android/server implementation
 
 `POST /api/v1/analyze`
 
-Accepts one photo and identifies visible waste items through OpenRouter and Gemma 4 31B. A separate regional-rules service will provide disposal steps and sources; until that service is connected, identified items use `sorting_status: unknown` with empty steps and sources.
+Accepts one photo and sends it together with the complete Gwanak-gu rules JSON to OpenRouter and Gemma 4 31B. The model identifies visible waste items and creates step-by-step disposal guidance from those rules. The server validates the model-selected rule IDs and attaches source metadata from the JSON. Gwanak-gu rules are always applied in this demo.
 
 ## Request
 
@@ -16,7 +16,7 @@ Content type: `multipart/form-data`
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `image` | file | Yes | One waste photo. JPEG, PNG, and WebP are accepted based on decoded image contents (not the MIME header). Maximum file size is 10 MiB and maximum image size is 24,000,000 pixels. Valid images are orientation-corrected, resized to a maximum side of 4,096 pixels, and normalized to JPEG in memory. |
-| `region` | string | No | Human-readable region hint, such as `Seoul, Mapo-gu`. If absent or insufficient to select a local rule, the result must say that local confirmation is needed. |
+| `region` | string | No | Retained for API compatibility. The value does not select rules; this demo always applies and returns `서울특별시 관악구`. |
 
 The server does not retain the original upload or normalized image after processing. The multipart parser may spool uploads to a temporary file; the upload handle is closed after validation, and the normalized image is held only for the request.
 
@@ -26,7 +26,7 @@ The server does not retain the original upload or normalized image after process
 {
   "request_id": "b6ae1511-1bc3-4bc3-ae98-03ac2a0e0320",
   "status": "identified",
-  "region": "Seoul, Mapo-gu",
+  "region": "서울특별시 관악구",
   "items": [
     {
       "name": "투명 페트병",
@@ -42,8 +42,8 @@ The server does not retain the original upload or normalized image after process
       "sources": [
         {
           "title": "분리배출 안내",
-          "url": "https://example.org/recycling",
-          "region": "Seoul, Mapo-gu",
+          "url": "https://www.gwanak.go.kr/site/gwanak/07/10703010200002016051206.jsp",
+          "region": "서울특별시 관악구",
           "checked_at": "2026-11-14"
         }
       ]
@@ -53,24 +53,24 @@ The server does not retain the original upload or normalized image after process
 }
 ```
 
-The sample source URL uses the reserved `example.org` domain and is illustrative only; it is not a real recycling-rule source.
+The sample source points to the official Gwanak-gu recycling guidance page.
 
 ## Response fields
 
 - `request_id`: UUID for support and log correlation; it must not contain user or image data.
 - `status`: `identified`, `needs_clarification`, or `unidentified`.
-- `region`: normalized or echoed region hint when known, otherwise `null`.
+- `region`: always `서울특별시 관악구` in this demo; the optional request `region` field is ignored.
 - `items`: zero or more detected items. Multiple objects in one photo can be represented independently.
 - `name`: user-facing item name.
 - `material`: recognized material when known; otherwise `null`.
 - `confidence`: model confidence from `0.0` to `1.0`; `null` when not available. It is not a guarantee that the sorting rule is correct.
-- `sorting_status`: `recyclable`, `general_waste`, `local_confirmation_required`, or `unknown`.
+- `sorting_status`: `recyclable`, `general_waste`, `food_waste`, `local_confirmation_required`, or `unknown`.
 - `steps`: ordered actions. Each `order` starts at 1 and is unique within that item.
 - `cautions`: additional warnings for that item.
 - `sources`: supporting rule sources. Each source has a title, URL, applicable region when known, and the date it was checked; `checked_at` may be `null` if unavailable.
 - `message`: optional user-facing explanation, especially when clarification is needed or no item can be identified.
 
-`needs_clarification` and `unidentified` responses may have an empty `items` array. The API must not invent a local rule or source when none is available. A `local_confirmation_required` item may include general preparation steps, but must clearly state that the final disposal route needs local confirmation.
+`needs_clarification` and `unidentified` responses may have an empty `items` array. The API must not invent a local rule or source when none is available. The model receives the complete Gwanak-gu JSON with the photo; the server only accepts guidance when the returned rule IDs exist and their sorting status agrees with the selected rules. A `local_confirmation_required` item has no unsupported steps or cautions and clearly states that the final disposal route needs local confirmation.
 
 ## Errors
 

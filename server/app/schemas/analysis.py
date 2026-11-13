@@ -1,4 +1,4 @@
-﻿from datetime import date
+from datetime import date
 from enum import StrEnum
 from typing import Annotated
 from uuid import UUID
@@ -15,6 +15,7 @@ class AnalysisStatus(StrEnum):
 class SortingStatus(StrEnum):
     RECYCLABLE = "recyclable"
     GENERAL_WASTE = "general_waste"
+    FOOD_WASTE = "food_waste"
     LOCAL_CONFIRMATION_REQUIRED = "local_confirmation_required"
     UNKNOWN = "unknown"
 

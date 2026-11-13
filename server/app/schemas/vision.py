@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.analysis import AnalysisStatus
+from app.schemas.analysis import AnalysisStatus, SortingStatus, SortingStep
 
 
 class VisionItem(BaseModel):
@@ -11,6 +11,10 @@ class VisionItem(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=100)]
     material: Annotated[str, Field(max_length=100)] | None
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] | None
+    sorting_status: SortingStatus
+    steps: Annotated[list[SortingStep], Field(max_length=8)]
+    cautions: Annotated[list[str], Field(max_length=8)]
+    rule_ids: Annotated[list[Annotated[str, Field(min_length=1, max_length=100)]], Field(max_length=6)]
 
 
 class VisionAnalysis(BaseModel):
@@ -21,8 +25,6 @@ class VisionAnalysis(BaseModel):
     message: Annotated[str, Field(max_length=400)] | None
 
 
-# Inline strict JSON Schema keeps the OpenRouter request compatible with providers
-# that require every object property to be listed as required.
 VISION_JSON_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -45,8 +47,50 @@ VISION_JSON_SCHEMA = {
                         "minimum": 0.0,
                         "maximum": 1.0,
                     },
+                    "sorting_status": {
+                        "type": "string",
+                        "enum": [
+                            "recyclable",
+                            "general_waste",
+                            "food_waste",
+                            "local_confirmation_required",
+                            "unknown",
+                        ],
+                    },
+                    "steps": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "order": {"type": "integer", "minimum": 1},
+                                "title": {"type": "string", "minLength": 1},
+                                "instruction": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["order", "title", "instruction"],
+                        },
+                    },
+                    "cautions": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {"type": "string", "maxLength": 400},
+                    },
+                    "rule_ids": {
+                        "type": "array",
+                        "maxItems": 6,
+                        "items": {"type": "string", "minLength": 1, "maxLength": 100},
+                    },
                 },
-                "required": ["name", "material", "confidence"],
+                "required": [
+                    "name",
+                    "material",
+                    "confidence",
+                    "sorting_status",
+                    "steps",
+                    "cautions",
+                    "rule_ids",
+                ],
             },
         },
         "message": {"type": ["string", "null"], "maxLength": 400},

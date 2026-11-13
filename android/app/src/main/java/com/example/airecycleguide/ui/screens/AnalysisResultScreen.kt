@@ -186,6 +186,7 @@ private fun SourceInfo(source: GuidanceSource) {
 
 private fun sortingStatusLabel(status: String): String = when (status) {
     "recyclable" -> "재활용 가능"
+    "food_waste" -> "음식물 쓰레기"
     "general_waste" -> "일반 쓰레기"
     "local_confirmation_required" -> "지역 확인 필요"
     "unknown" -> "안내 확인 필요"
