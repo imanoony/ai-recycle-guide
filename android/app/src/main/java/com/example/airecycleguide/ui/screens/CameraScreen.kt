@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -147,12 +150,15 @@ fun CameraScreen(
                     onClick = ::takePhoto,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp),
+                        .navigationBarsPadding().padding(bottom = 32.dp),
                 )
 
                 SnackbarHost(
                     hostState = snackbarHostState,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 24.dp),
                 )
             }
         }
@@ -175,7 +181,7 @@ fun CameraScreen(
         )
 
         CameraPermissionState.NOT_REQUESTED -> Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black),
+            modifier = Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding(),
         )
     }
 }
@@ -210,7 +216,7 @@ private fun PermissionMessage(
     onAction: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black),
+        modifier = Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
