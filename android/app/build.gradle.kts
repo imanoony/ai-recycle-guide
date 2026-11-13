@@ -20,10 +20,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            val apiBaseUrl = providers.gradleProperty("apiBaseUrl")
+                .orElse("http://10.0.2.2:8000/")
+                .get()
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        }
         release {
             optimization {
                 enable = false
             }
+            val releaseApiBaseUrl = providers.gradleProperty("releaseApiBaseUrl")
+                .orElse("")
+                .get()
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
         }
     }
     compileOptions {
@@ -32,6 +42,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -44,6 +55,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.converter.gson)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
